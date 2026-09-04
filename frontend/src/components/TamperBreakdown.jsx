@@ -7,8 +7,8 @@ export default function TamperBreakdown({ tamperRiskScore, signals, triggeredSig
   if (tamperRiskScore === undefined || !signals) return null;
 
   const getRiskColor = (score) => {
-    if (score >= 65) return { text: 'text-rose-400', border: 'border-rose-500', bg: 'bg-rose-500', pill: 'bg-rose-950 text-rose-300 border-rose-800' };
-    if (score >= 30) return { text: 'text-amber-400', border: 'border-amber-500', bg: 'bg-amber-500', pill: 'bg-amber-950 text-amber-300 border-amber-800' };
+    if (score >= 30) return { text: 'text-rose-400', border: 'border-rose-500', bg: 'bg-rose-500', pill: 'bg-rose-950 text-rose-300 border-rose-800' };
+    if (score >= 15) return { text: 'text-amber-400', border: 'border-amber-500', bg: 'bg-amber-500', pill: 'bg-amber-950 text-amber-300 border-amber-800' };
     return { text: 'text-emerald-400', border: 'border-emerald-500', bg: 'bg-emerald-500', pill: 'bg-emerald-950 text-emerald-300 border-emerald-800' };
   };
 

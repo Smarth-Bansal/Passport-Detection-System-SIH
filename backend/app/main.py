@@ -119,7 +119,7 @@ def compute_recommendation(
         face_match_result.get("is_match") is False
     )
 
-    if tamper_risk_score > TAMPER_RISK_MEDIUM_MAX or has_critical_validation_error or face_match_failed:
+    if tamper_risk_score >= TAMPER_RISK_MEDIUM_MAX or has_critical_validation_error or face_match_failed:
         return "HIGH — flag for secondary inspection"
     elif tamper_risk_score > TAMPER_RISK_LOW_MAX or not mrz_checksum_valid or not validation_result.get("passed", False):
         return "MEDIUM — manual review"

@@ -26,6 +26,6 @@ WEIGHT_ELA_DIFF = 0.25
 WEIGHT_EXIF_FORENSICS = 0.15
 WEIGHT_MRZ_CHECKSUM = 0.25
 
-# Risk Thresholds
-TAMPER_RISK_LOW_MAX = 30.0
-TAMPER_RISK_MEDIUM_MAX = 65.0
+# Risk Thresholds (Module 4: Tamper Risk Score >= 30 triggers HIGH — flag for secondary inspection)
+TAMPER_RISK_LOW_MAX = 15.0
+TAMPER_RISK_MEDIUM_MAX = 30.0
