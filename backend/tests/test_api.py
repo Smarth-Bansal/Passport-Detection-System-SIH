@@ -104,3 +104,38 @@ def test_screen_endpoint_with_crop_mode_and_photo_forensics():
     assert "splice_detected" in res["face_match"]["photo_determination"]
     assert "flags" in res["face_match"]["photo_determination"]
 
+
+def test_screen_endpoint_with_selfie_and_audit_persistence():
+    doc_img = create_synthetic_passport_image()
+    _, doc_enc = cv2.imencode(".jpg", doc_img)
+
+    # Synthetic selfie image
+    selfie_img = np.ones((200, 200, 3), dtype=np.uint8) * 180
+    cv2.circle(selfie_img, (100, 100), 50, (150, 150, 150), -1)
+    _, selfie_enc = cv2.imencode(".jpg", selfie_img)
+
+    files = {
+        "document_image": ("passport_with_selfie.jpg", doc_enc.tobytes(), "image/jpeg"),
+        "live_selfie": ("traveler_selfie.jpg", selfie_enc.tobytes(), "image/jpeg"),
+    }
+    data = {
+        "crop_mode": "auto",
+        "force_crop": "true",
+    }
+
+    response = client.post("/screen", files=files, data=data)
+    assert response.status_code == 200
+    res = response.json()
+
+    assert res["face_match"]["performed"] is True
+    assert "is_match" in res["face_match"]
+    assert isinstance(res["face_match"]["is_match"], bool)
+    assert isinstance(res["face_match"]["match_score"], (int, float))
+
+    # Verify audit persistence worked and didn't crash on json.dumps
+    audit_id = res["audit_id"]
+    audit_resp = client.get(f"/audit/{audit_id}")
+    assert audit_resp.status_code == 200
+    assert audit_resp.json()["id"] == audit_id
+
+

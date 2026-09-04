@@ -60,6 +60,46 @@ def get_db() -> Generator[Session, None, None]:
         db.close()
 
 
+def sanitize_for_json(obj: Any) -> Any:
+    """
+    Recursively converts numpy primitives, dates, and non-standard objects
+    into native Python primitives safe for json.dumps and FastAPI serialization.
+    """
+    if obj is None:
+        return None
+    # Check for numpy boolean or python boolean
+    if isinstance(obj, bool) or type(obj).__name__ in ("bool", "bool_"):
+        return bool(obj)
+    if hasattr(obj, "item"):
+        try:
+            return sanitize_for_json(obj.item())
+        except Exception:
+            pass
+    if isinstance(obj, (int, float, str)):
+        return obj
+    if hasattr(obj, "isoformat"):
+        return obj.isoformat()
+    if isinstance(obj, dict):
+        return {str(k): sanitize_for_json(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple, set)):
+        return [sanitize_for_json(v) for v in obj]
+    return str(obj)
+
+
+def json_serial_default(obj: Any) -> Any:
+    """Fallback serializer for json.dumps to avoid 500 errors on foreign types."""
+    if isinstance(obj, bool) or type(obj).__name__ in ("bool", "bool_"):
+        return bool(obj)
+    if hasattr(obj, "item"):
+        try:
+            return obj.item()
+        except Exception:
+            pass
+    if hasattr(obj, "isoformat"):
+        return obj.isoformat()
+    return str(obj)
+
+
 def save_audit_record(
     db: Session,
     passport_number: Optional[str],
@@ -73,6 +113,7 @@ def save_audit_record(
     model_version: str,
     raw_result: Dict[str, Any],
 ) -> AuditLog:
+    clean_result = sanitize_for_json(raw_result)
     record = AuditLog(
         id=str(uuid.uuid4()),
         timestamp=datetime.now(timezone.utc),
@@ -80,12 +121,12 @@ def save_audit_record(
         traveler_name=traveler_name,
         nationality=nationality,
         issuing_country=issuing_country,
-        mrz_checksum_valid=mrz_checksum_valid,
-        tamper_risk_score=round(tamper_risk_score, 1),
-        face_match_score=round(face_match_score, 1) if face_match_score is not None else None,
+        mrz_checksum_valid=bool(mrz_checksum_valid),
+        tamper_risk_score=float(round(tamper_risk_score, 1)),
+        face_match_score=float(round(face_match_score, 1)) if face_match_score is not None else None,
         overall_recommendation=overall_recommendation,
         model_version=model_version,
-        raw_result=json.dumps(raw_result),
+        raw_result=json.dumps(clean_result, default=json_serial_default),
     )
     db.add(record)
     db.commit()

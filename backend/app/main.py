@@ -17,7 +17,14 @@ from .config import (
     TAMPER_RISK_LOW_MAX,
     TAMPER_RISK_MEDIUM_MAX,
 )
-from .database import init_db, get_db, save_audit_record, get_audit_logs, get_audit_by_id
+from .database import (
+    init_db,
+    get_db,
+    save_audit_record,
+    get_audit_logs,
+    get_audit_by_id,
+    sanitize_for_json,
+)
 from .services import (
     scan_passport,
     ScannerError,
@@ -193,7 +200,7 @@ async def screen_document(
     )
 
     # Assemble complete payload
-    screening_payload = {
+    raw_payload = {
         "scan_metadata": {
             "contour_detected": scan_result["contour_detected"],
             "aspect_ratio": scan_result["aspect_ratio"],
@@ -226,6 +233,9 @@ async def screen_document(
         "kaggle_notebook_ref": KAGGLE_NOTEBOOK_REF,
     }
 
+    # Ensure all nested values are 100% native JSON-serializable primitives (cleans numpy bools/floats)
+    screening_payload = sanitize_for_json(raw_payload)
+
     # Step 7: Audit Log Persistence
     audit_entry = save_audit_record(
         db=db,
@@ -241,7 +251,7 @@ async def screen_document(
         raw_result=screening_payload,
     )
 
-    screening_payload["audit_id"] = audit_entry.id
+    screening_payload["audit_id"] = str(audit_entry.id)
     screening_payload["audit_timestamp"] = audit_entry.timestamp.isoformat()
 
     return screening_payload

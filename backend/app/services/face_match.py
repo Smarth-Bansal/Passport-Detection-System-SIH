@@ -197,18 +197,18 @@ def analyze_photo_tampering_and_compliance(portrait_bgr: np.ndarray, full_doc_bg
         verdict = "AUTHENTIC: Uniform Photo Integration & ICAO Alignment"
 
     return {
-        "photo_risk_score": photo_risk_score,
-        "splice_detected": splice_detected,
-        "edge_gradient_score": round(laplacian_var, 2),
-        "verdict": verdict,
-        "flags": flags,
-        "is_flagged": photo_risk_score >= 30.0,
+        "photo_risk_score": float(photo_risk_score),
+        "splice_detected": bool(splice_detected),
+        "edge_gradient_score": float(round(laplacian_var, 2)),
+        "verdict": str(verdict),
+        "flags": [str(f) for f in flags],
+        "is_flagged": bool(photo_risk_score >= 30.0),
         "icao_compliance": {
-            "face_detected": landmarks_detected or (photo_box["width"] > 60),
-            "landmarks_detected": landmarks_detected,
-            "head_tilt_degrees": head_tilt_deg,
-            "eyes_horizontal": eyes_horizontal,
-            "photo_ela_std": round(photo_ela_std, 2),
+            "face_detected": bool(landmarks_detected or (photo_box["width"] > 60)),
+            "landmarks_detected": bool(landmarks_detected),
+            "head_tilt_degrees": float(head_tilt_deg),
+            "eyes_horizontal": bool(eyes_horizontal),
+            "photo_ela_std": float(round(photo_ela_std, 2)),
         }
     }
 
@@ -327,13 +327,14 @@ def compare_faces(
 
     # Normalized structural fallback if encodings were unavailable
     if match_score is None:
-        match_score = fallback_feature_similarity(portrait_bgr, selfie_crop)
+        match_score = float(fallback_feature_similarity(portrait_bgr, selfie_crop))
         engine_used = "Color Chrominance Correlation Fallback"
 
-    is_match = match_score >= 60.0
+    match_score = float(round(match_score, 1))
+    is_match = bool(match_score >= 60.0)
     result["match_score"] = match_score
     result["is_match"] = is_match
-    result["engine"] = engine_used
+    result["engine"] = str(engine_used)
     result["summary"] = f"Face match score: {match_score}% ({'Match Confirmed' if is_match else 'Low Similarity Flag'}) • {photo_forensics['verdict']}"
 
     return result
