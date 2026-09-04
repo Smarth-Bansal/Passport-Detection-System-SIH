@@ -1,10 +1,9 @@
 import React, { useState, useRef } from 'react';
-import { Upload, Camera, FileCheck, RefreshCw, AlertCircle, Sparkles, UserCheck } from 'lucide-react';
+import { Upload, Camera, FileCheck, RefreshCw, AlertCircle, UserCheck } from 'lucide-react';
 
 export default function UploadSection({
   onScreen,
   loading,
-  onLoadSample,
   forceCrop,
   setForceCrop,
 }) {
@@ -91,17 +90,6 @@ export default function UploadSection({
     });
   };
 
-  const handleSampleClick = (sampleType) => {
-    onLoadSample(sampleType, (file, preview, selfieF, selfieP) => {
-      setDocFile(file);
-      setDocPreview(preview);
-      if (selfieF) {
-        setSelfieFile(selfieF);
-        setSelfiePreview(selfieP);
-      }
-    });
-  };
-
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl relative overflow-hidden">
       {/* Background radial highlight */}
@@ -116,41 +104,6 @@ export default function UploadSection({
           <p className="text-xs text-slate-400">
             Accepts raw mobile photos, flatbed scans, or webcam frames (Auto-deskews ~1.42:1 TD3 bio-data page)
           </p>
-        </div>
-
-        {/* Demo Sample Quick-Loaders */}
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className="text-[11px] text-slate-400 mr-1 flex items-center">
-            <Sparkles className="w-3 h-3 text-amber-400 mr-1" /> Test Samples:
-          </span>
-          <button
-            type="button"
-            onClick={() => handleSampleClick("authentic")}
-            className="px-2.5 py-1 text-[11px] font-medium bg-emerald-950/60 hover:bg-emerald-900/80 text-emerald-300 border border-emerald-800/80 rounded-md transition-colors"
-          >
-            Authentic Pass
-          </button>
-          <button
-            type="button"
-            onClick={() => handleSampleClick("tampered_photo")}
-            className="px-2.5 py-1 text-[11px] font-medium bg-rose-950/60 hover:bg-rose-900/80 text-rose-300 border border-rose-800/80 rounded-md transition-colors"
-          >
-            Photo Splice (Tamper)
-          </button>
-          <button
-            type="button"
-            onClick={() => handleSampleClick("blacklisted")}
-            className="px-2.5 py-1 text-[11px] font-medium bg-amber-950/60 hover:bg-amber-900/80 text-amber-300 border border-amber-800/80 rounded-md transition-colors"
-          >
-            Stolen / Blacklisted
-          </button>
-          <button
-            type="button"
-            onClick={() => handleSampleClick("bad_checksum")}
-            className="px-2.5 py-1 text-[11px] font-medium bg-purple-950/60 hover:bg-purple-900/80 text-purple-300 border border-purple-800/80 rounded-md transition-colors"
-          >
-            Bad MRZ Checksum
-          </button>
         </div>
       </div>
 
