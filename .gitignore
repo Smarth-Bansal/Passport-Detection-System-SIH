@@ -11,3 +11,4 @@ node_modules/
 *.ses
 docuverify.db
 .env
+.matplotlib_cache/
