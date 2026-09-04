@@ -286,3 +286,48 @@ def test_compare_faces_without_selfie():
     res = compare_faces(img, live_selfie_bytes=None)
     assert res["performed"] is False
     assert "liveness_limitation_note" in res
+
+
+def test_biometric_tier_thresholds():
+    img = create_synthetic_passport_image()
+    # Mock selfie bytes
+    _, enc = cv2.imencode(".jpg", np.ones((100, 100, 3), dtype=np.uint8) * 200)
+    res = compare_faces(img, live_selfie_bytes=enc.tobytes())
+    assert res["performed"] is True
+    assert "match_status" in res
+    assert res["match_status"] in ["pass", "not_sure", "mismatch"]
+    assert "match_verdict" in res
+    assert isinstance(res["is_match"], bool)
+
+
+def test_compute_recommendation_biometric_tiers():
+    from backend.app.main import compute_recommendation
+    valid_res = {"passed": True, "issues": []}
+
+    # 1. Biometric Mismatch (< 40%) -> HIGH: secondary inspection
+    rec_mismatch = compute_recommendation(
+        tamper_risk_score=5.0,
+        validation_result=valid_res,
+        mrz_checksum_valid=True,
+        face_match_result={"performed": True, "match_score": 32.0, "match_status": "mismatch", "is_match": False}
+    )
+    assert rec_mismatch == "HIGH — flag for secondary inspection"
+
+    # 2. Biometric Not Sure (40% - 55%) -> MEDIUM: manual review
+    rec_not_sure = compute_recommendation(
+        tamper_risk_score=5.0,
+        validation_result=valid_res,
+        mrz_checksum_valid=True,
+        face_match_result={"performed": True, "match_score": 48.0, "match_status": "not_sure", "is_match": False}
+    )
+    assert rec_not_sure == "MEDIUM — manual review"
+
+    # 3. Biometric Pass (>= 55%) -> LOW RISK: proceed
+    rec_pass = compute_recommendation(
+        tamper_risk_score=5.0,
+        validation_result=valid_res,
+        mrz_checksum_valid=True,
+        face_match_result={"performed": True, "match_score": 75.0, "match_status": "pass", "is_match": True}
+    )
+    assert rec_pass == "LOW RISK — proceed"
+

@@ -17,6 +17,8 @@ from .config import (
     KAGGLE_NOTEBOOK_REF,
     TAMPER_RISK_LOW_MAX,
     TAMPER_RISK_MEDIUM_MAX,
+    FACE_MATCH_MISMATCH_MAX,
+    FACE_MATCH_PASS_MIN,
 )
 from .database import (
     init_db,
@@ -114,14 +116,30 @@ def compute_recommendation(
         for issue in validation_result.get("issues", [])
     )
 
-    face_match_failed = (
-        face_match_result.get("performed", False) and
-        face_match_result.get("is_match") is False
+    face_match_performed = face_match_result.get("performed", False)
+    face_match_status = face_match_result.get("match_status")
+    face_score = face_match_result.get("match_score")
+
+    # 1:1 Biometric Verification:
+    # - Mismatch (< 40%) flags for secondary inspection
+    # - Not Sure (40% - 55%) routes to manual review
+    # - Pass (>= 55%) passes biometric check
+    face_match_mismatch = face_match_performed and (
+        face_match_status == "mismatch" or (
+            face_score is not None and face_score < FACE_MATCH_MISMATCH_MAX
+        ) or (
+            face_score is None and face_match_result.get("is_match") is False
+        )
+    )
+    face_match_not_sure = face_match_performed and (
+        face_match_status == "not_sure" or (
+            face_score is not None and FACE_MATCH_MISMATCH_MAX <= face_score < FACE_MATCH_PASS_MIN
+        )
     )
 
-    if tamper_risk_score >= TAMPER_RISK_MEDIUM_MAX or has_critical_validation_error or face_match_failed:
+    if tamper_risk_score >= TAMPER_RISK_MEDIUM_MAX or has_critical_validation_error or face_match_mismatch:
         return "HIGH — flag for secondary inspection"
-    elif tamper_risk_score > TAMPER_RISK_LOW_MAX or not mrz_checksum_valid or not validation_result.get("passed", False):
+    elif tamper_risk_score > TAMPER_RISK_LOW_MAX or not mrz_checksum_valid or not validation_result.get("passed", False) or face_match_not_sure:
         return "MEDIUM — manual review"
     return "LOW RISK — proceed"
 

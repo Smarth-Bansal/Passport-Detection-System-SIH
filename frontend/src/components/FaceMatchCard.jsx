@@ -137,10 +137,29 @@ export default function FaceMatchCard({ faceMatch }) {
 
       {/* 2. Biometric Facial Verification (Passport Crop vs Live Capture) */}
       <div className="pt-2">
-        <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-3 flex items-center">
-          <UserCheck className="w-3.5 h-3.5 mr-1.5 text-indigo-400" />
-          1:1 Biometric Traveler Cross-Verification
-        </h4>
+        <div className="flex items-center justify-between mb-3">
+          <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center">
+            <UserCheck className="w-3.5 h-3.5 mr-1.5 text-indigo-400" />
+            1:1 Biometric Traveler Cross-Verification
+          </h4>
+          {performed && (
+            <span
+              className={`px-2 py-0.5 rounded text-[10px] font-bold font-mono border ${
+                match_score >= 55
+                  ? 'bg-emerald-950 text-emerald-300 border-emerald-800'
+                  : match_score >= 40
+                  ? 'bg-amber-950 text-amber-300 border-amber-800'
+                  : 'bg-rose-950 text-rose-300 border-rose-800'
+              }`}
+            >
+              {match_score >= 55
+                ? '✓ PASS (MATCH)'
+                : match_score >= 40
+                ? '⚠️ NOT SURE (40-55%)'
+                : '✕ MISMATCH (<40%)'}
+            </span>
+          )}
+        </div>
 
         {performed ? (
           <div className="space-y-3">
@@ -167,20 +186,34 @@ export default function FaceMatchCard({ faceMatch }) {
             <div className="p-3 bg-slate-950/80 rounded-xl border border-slate-800 text-xs">
               <div className="flex justify-between items-center mb-1.5">
                 <span className="text-slate-300 font-semibold">Biometric Facial Similarity:</span>
-                <span className={`font-mono text-sm font-bold ${is_match ? 'text-indigo-400' : 'text-rose-400'}`}>
-                  {match_score !== null ? `${match_score}%` : 'N/A'}
+                <span className={`font-mono text-sm font-bold ${
+                  match_score >= 55
+                    ? 'text-emerald-400'
+                    : match_score >= 40
+                    ? 'text-amber-400'
+                    : 'text-rose-400'
+                }`}>
+                  {match_score !== null ? `${match_score}%` : 'N/A'} {
+                    match_score !== null
+                      ? `(${match_score >= 55 ? 'Pass' : match_score >= 40 ? 'Not Sure' : 'Mismatch'})`
+                      : ''
+                  }
                 </span>
               </div>
               <div className="w-full h-2 rounded-full bg-slate-800 overflow-hidden">
                 <div
                   className={`h-full transition-all duration-500 rounded-full ${
-                    is_match ? 'bg-indigo-500' : 'bg-rose-500'
+                    match_score >= 55
+                      ? 'bg-emerald-500'
+                      : match_score >= 40
+                      ? 'bg-amber-500'
+                      : 'bg-rose-500'
                   }`}
                   style={{ width: `${Math.min(100, Math.max(0, match_score || 0))}%` }}
                 />
               </div>
               <div className="flex items-center justify-between text-[10px] text-slate-500 mt-1">
-                <span>Threshold: 60%</span>
+                <span>Thresholds: &lt;40% Mismatch | 40–55% Not Sure | &ge;55% Pass</span>
                 <span className="font-mono text-slate-400">{engine}</span>
               </div>
             </div>

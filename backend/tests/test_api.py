@@ -131,6 +131,7 @@ def test_screen_endpoint_with_selfie_and_audit_persistence():
     assert "is_match" in res["face_match"]
     assert isinstance(res["face_match"]["is_match"], bool)
     assert isinstance(res["face_match"]["match_score"], (int, float))
+    assert res["face_match"]["match_status"] in ["pass", "not_sure", "mismatch"]
 
     # Verify audit persistence worked and didn't crash on json.dumps
     audit_id = res["audit_id"]

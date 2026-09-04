@@ -16,6 +16,13 @@ try:
 except ImportError:
     dlib = None
 
+try:
+    from ..config import FACE_MATCH_MISMATCH_MAX, FACE_MATCH_PASS_MIN
+except ImportError:
+    FACE_MATCH_MISMATCH_MAX = 40.0
+    FACE_MATCH_PASS_MIN = 55.0
+
+
 
 def image_to_base64(img_bgr: np.ndarray, quality: int = 90) -> str:
     """Converts a BGR OpenCV image to a base64 encoded data URL."""
@@ -270,6 +277,8 @@ def compare_faces(
         "live_face_preview_base64": None,
         "match_score": None,
         "is_match": None,
+        "match_status": None,
+        "match_verdict": None,
         "engine": "dlib 128-d Deep Face Encodings",
         "photo_determination": photo_forensics,
         "liveness_detected": False,
@@ -338,10 +347,32 @@ def compare_faces(
         engine_used = "Color Chrominance Correlation Fallback"
 
     match_score = float(round(match_score, 1))
-    is_match = bool(match_score >= 60.0)
+
+    # 1:1 Biometric Verification Threshold Calibration:
+    # - Below 40.0: Mismatch (flag for secondary inspection)
+    # - 40.0 to 55.0: Not Sure (manual review required)
+    # - 55.0 and above: Pass (confirmed match)
+    if match_score >= FACE_MATCH_PASS_MIN:
+        match_status = "pass"
+        match_verdict = "PASS"
+        summary_verdict = "Pass (Match Confirmed)"
+        is_match = True
+    elif match_score >= FACE_MATCH_MISMATCH_MAX:
+        match_status = "not_sure"
+        match_verdict = "NOT SURE"
+        summary_verdict = "Not Sure (Manual Review Required)"
+        is_match = False
+    else:
+        match_status = "mismatch"
+        match_verdict = "MISMATCH"
+        summary_verdict = "Biometric Mismatch Flagged"
+        is_match = False
+
     result["match_score"] = match_score
     result["is_match"] = is_match
+    result["match_status"] = match_status
+    result["match_verdict"] = match_verdict
     result["engine"] = str(engine_used)
-    result["summary"] = f"Face match score: {match_score}% ({'Match Confirmed' if is_match else 'Low Similarity Flag'}) • {photo_forensics['verdict']}"
+    result["summary"] = f"Face match score: {match_score}% ({summary_verdict}) • {photo_forensics['verdict']}"
 
     return result

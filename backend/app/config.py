@@ -29,3 +29,8 @@ WEIGHT_MRZ_CHECKSUM = 0.25
 # Risk Thresholds (Module 4: Tamper Risk Score >= 30 triggers HIGH — flag for secondary inspection)
 TAMPER_RISK_LOW_MAX = 15.0
 TAMPER_RISK_MEDIUM_MAX = 30.0
+
+# 1:1 Biometric Face Match Thresholds (Module 5)
+FACE_MATCH_MISMATCH_MAX = 40.0  # < 40.0 is Mismatch (Flag for secondary inspection)
+FACE_MATCH_PASS_MIN = 55.0      # >= 55.0 is Pass; 40.0 <= Score < 55.0 is Not Sure (Manual review)
+
