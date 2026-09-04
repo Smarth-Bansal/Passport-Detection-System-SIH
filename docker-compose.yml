@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  docuverify:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: docuverify-app
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - PORT=8000
+      - HOST=0.0.0.0
+      - DATABASE_URL=sqlite:////app/docuverify.db
+      - MODEL_PATH=/app/backend/app/models/tamper_classifier.onnx
+      - MOCK_BLACKLIST_PATH=/app/backend/app/data/mock_blacklist.csv
+    volumes:
+      - docuverify-data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  docuverify-data:

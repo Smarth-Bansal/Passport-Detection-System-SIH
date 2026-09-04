@@ -1,0 +1,6 @@
+passport_number,country_code,surname,given_names,reason,category,added_date
+L898902C3,USA,DOE,JOHN,Reported stolen in transit,INTERPOL_SLTD_SIMULATED,2025-11-12
+987654321,GBR,MORIARTY,JAMES,Suspected document fraud / counterfeit flag,NATIONAL_WATCHLIST_SIMULATED,2026-01-15
+Z1234567,IND,SINGH,RAJESH,Lost passport reported by issuing embassy,INTERPOL_SLTD_SIMULATED,2025-08-20
+P10293847,CAN,SMITH,ALEX,Flagged for interview / fraudulent visa attempt,BORDER_WATCHLIST_SIMULATED,2026-02-01
+E44556677,DEU,MUELLER,HANS,Revoked travel credential,INTERPOL_SLTD_SIMULATED,2025-12-05

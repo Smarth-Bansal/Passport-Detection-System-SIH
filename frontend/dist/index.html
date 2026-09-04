@@ -1,0 +1,842 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%230284c7'><path d='M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14h2v2h-2v-2zm0-10h2v8h-2V6z'/></svg>" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>DocuVerify | AI-Powered Passport Screening & Tamper Detection</title>
+    <!-- Tailwind CSS CDN for instant zero-dependency execution -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              slate: {
+                850: '#151f33',
+                950: '#020617'
+              }
+            }
+          }
+        }
+      }
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- React & Babel Standalone -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+      body { font-family: 'Inter', sans-serif; background-color: #020617; color: #f8fafc; }
+      .font-mono { font-family: 'JetBrains Mono', monospace; }
+      ::-webkit-scrollbar { width: 6px; height: 6px; }
+      ::-webkit-scrollbar-track { background: #0b0f19; }
+      ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 3px; }
+    </style>
+  </head>
+  <body class="bg-slate-950 text-slate-100 min-h-screen">
+    <div id="root"></div>
+
+    <script type="text/babel">
+      const { useState, useEffect, useRef } = React;
+
+      function App() {
+        const [results, setResults] = useState(null);
+        const [loading, setLoading] = useState(false);
+        const [error, setError] = useState(null);
+        const [forceCrop, setForceCrop] = useState(false);
+        const [historyOpen, setHistoryOpen] = useState(false);
+        const [limitationsOpen, setLimitationsOpen] = useState(false);
+        const [logs, setLogs] = useState([]);
+        const [docFile, setDocFile] = useState(null);
+        const [docPreview, setDocPreview] = useState(null);
+        const [selfieFile, setSelfieFile] = useState(null);
+        const [selfiePreview, setSelfiePreview] = useState(null);
+        const [showHeatmap, setShowHeatmap] = useState(false);
+        const [showRawMrz, setShowRawMrz] = useState(false);
+
+        const docInputRef = useRef(null);
+        const selfieInputRef = useRef(null);
+
+        useEffect(() => {
+          fetchLogs();
+        }, []);
+
+        const fetchLogs = async () => {
+          try {
+            const res = await fetch('/history');
+            if (res.ok) {
+              const data = await res.json();
+              setLogs(data);
+            }
+          } catch (e) {
+            console.warn(e);
+          }
+        };
+
+        const handleDocSelect = (file) => {
+          setDocFile(file);
+          const reader = new FileReader();
+          reader.onload = (e) => setDocPreview(e.target.result);
+          reader.readAsDataURL(file);
+        };
+
+        const handleSelfieSelect = (file) => {
+          setSelfieFile(file);
+          const reader = new FileReader();
+          reader.onload = (e) => setSelfiePreview(e.target.result);
+          reader.readAsDataURL(file);
+        };
+
+        const handleLoadSample = (sampleType) => {
+          const canvas = document.createElement("canvas");
+          canvas.width = 1420;
+          canvas.height = 1000;
+          const ctx = canvas.getContext("2d");
+
+          ctx.fillStyle = "#f8fafc";
+          ctx.fillRect(0, 0, 1420, 1000);
+
+          ctx.strokeStyle = "#cbd5e1";
+          ctx.lineWidth = 1;
+          for (let y = 100; y < 750; y += 14) {
+            ctx.beginPath();
+            ctx.moveTo(40, y);
+            ctx.lineTo(1380, y);
+            ctx.stroke();
+          }
+
+          ctx.strokeStyle = "#475569";
+          ctx.lineWidth = 4;
+          ctx.strokeRect(30, 30, 1360, 940);
+
+          ctx.fillStyle = "#0f172a";
+          ctx.font = "bold 34px sans-serif";
+          ctx.fillText("PASSPORT / PASSEPORT", 480, 90);
+          ctx.font = "24px sans-serif";
+          ctx.fillStyle = "#334155";
+          ctx.fillText("UNITED STATES OF AMERICA", 480, 130);
+
+          ctx.fillStyle = "#cbd5e1";
+          ctx.fillRect(60, 180, 380, 520);
+          ctx.strokeStyle = "#64748b";
+          ctx.lineWidth = 2;
+          ctx.strokeRect(60, 180, 380, 520);
+
+          ctx.fillStyle = "#fed7aa";
+          ctx.beginPath();
+          ctx.arc(250, 390, 105, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.fillStyle = "#1e293b";
+          ctx.beginPath();
+          ctx.arc(250, 330, 110, Math.PI, 0);
+          ctx.fill();
+
+          ctx.fillStyle = "#0f172a";
+          ctx.fillRect(205, 375, 18, 10);
+          ctx.fillRect(275, 375, 18, 10);
+
+          ctx.strokeStyle = "#e11d48";
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.arc(250, 430, 35, 0.2, Math.PI - 0.2);
+          ctx.stroke();
+
+          if (sampleType === "tampered_photo") {
+            ctx.fillStyle = "rgba(180, 30, 30, 0.35)";
+            ctx.fillRect(90, 230, 310, 400);
+            ctx.strokeStyle = "#ef4444";
+            ctx.lineWidth = 2;
+            ctx.strokeRect(90, 230, 310, 400);
+            ctx.fillStyle = "#991b1b";
+            ctx.font = "14px monospace";
+            ctx.fillText("[PHOTO SPLICED REPLACEMENT]", 100, 220);
+          }
+
+          let passNum = "123456789";
+          let surname = "DOE";
+          let given = "JOHN";
+          let dob = "900101";
+          let exp = "300101";
+          let pChk = "7";
+          let expChk = "6";
+
+          if (sampleType === "blacklisted") {
+            passNum = "L898902C3";
+            pChk = "3";
+          } else if (sampleType === "bad_checksum") {
+            expChk = "9"; // invalid check digit
+          }
+
+          ctx.fillStyle = "#0f172a";
+          ctx.font = "bold 20px sans-serif";
+          ctx.fillText("Type: P", 500, 220);
+          ctx.fillText("Code: USA", 760, 220);
+          ctx.fillText(`Passport No: ${passNum}`, 960, 220);
+          ctx.fillText(`Surname: ${surname}`, 500, 300);
+          ctx.fillText(`Given Names: ${given}`, 500, 370);
+          ctx.fillText("Nationality: UNITED STATES OF AMERICA", 500, 440);
+          ctx.fillText("Date of Birth: 01 JAN 1990", 500, 510);
+          ctx.fillText("Sex: M", 960, 510);
+
+          ctx.fillStyle = "#020617";
+          ctx.fillRect(40, 780, 1340, 175);
+          ctx.fillStyle = "#22c55e";
+          ctx.font = "bold 28px monospace";
+
+          const line1 = `P<USA${surname}<<${given}`.padEnd(44, '<');
+          const line2 = `${passNum}${pChk}USA${dob}4M${exp}${expChk}<<<<<<<<<<<<<<4`;
+          ctx.fillText(line1, 70, 840);
+          ctx.fillText(line2, 70, 910);
+
+          canvas.toBlob((blob) => {
+            const f = new File([blob], `${sampleType}_passport.jpg`, { type: "image/jpeg" });
+            handleDocSelect(f);
+
+            // Synthetic selfie
+            const sCanvas = document.createElement("canvas");
+            sCanvas.width = 400;
+            sCanvas.height = 400;
+            const sCtx = sCanvas.getContext("2d");
+            sCtx.fillStyle = "#0f172a";
+            sCtx.fillRect(0, 0, 400, 400);
+            sCtx.fillStyle = "#fed7aa";
+            sCtx.beginPath();
+            sCtx.arc(200, 200, 110, 0, Math.PI * 2);
+            sCtx.fill();
+            sCtx.fillStyle = "#0f172a";
+            sCtx.fillRect(155, 185, 20, 12);
+            sCtx.fillRect(225, 185, 20, 12);
+
+            sCanvas.toBlob((sBlob) => {
+              const sf = new File([sBlob], "traveler_live.jpg", { type: "image/jpeg" });
+              handleSelfieSelect(sf);
+            }, "image/jpeg", 0.9);
+          }, "image/jpeg", 0.92);
+        };
+
+        const handleScreenSubmit = async (e) => {
+          e.preventDefault();
+          if (!docFile) {
+            alert("Please select or drop a passport bio-data image to screen.");
+            return;
+          }
+          setLoading(true);
+          setError(null);
+          try {
+            const fd = new FormData();
+            fd.append("document_image", docFile);
+            if (selfieFile) fd.append("live_selfie", selfieFile);
+            fd.append("force_crop", forceCrop ? "true" : "false");
+
+            const res = await fetch("/screen", { method: "POST", body: fd });
+            if (!res.ok) {
+              const errJson = await res.json().catch(() => ({}));
+              throw new Error(errJson.message || errJson.detail || `Screening failed with status ${res.status}`);
+            }
+            const data = await res.json();
+            setResults(data);
+            fetchLogs();
+          } catch (err) {
+            setError(err.message);
+          } finally {
+            setLoading(false);
+          }
+        };
+
+        const getRecommendationBadge = (rec) => {
+          if (!rec) return null;
+          if (rec.startsWith("HIGH")) {
+            return {
+              bg: "bg-rose-950/90 border-rose-600 text-rose-200",
+              pill: "bg-rose-600 text-white",
+              tag: "HIGH — FLAG FOR SECONDARY INSPECTION"
+            };
+          }
+          if (rec.startsWith("MEDIUM")) {
+            return {
+              bg: "bg-amber-950/90 border-amber-600 text-amber-200",
+              pill: "bg-amber-600 text-slate-950",
+              tag: "MEDIUM — MANUAL OFFICER REVIEW"
+            };
+          }
+          return {
+            bg: "bg-emerald-950/90 border-emerald-600 text-emerald-200",
+            pill: "bg-emerald-600 text-white",
+            tag: "LOW RISK — PROCEED"
+          };
+        };
+
+        const recInfo = getRecommendationBadge(results?.overall_recommendation);
+
+        return (
+          <div className="min-h-screen flex flex-col bg-slate-950 text-slate-100">
+            {/* Header */}
+            <header className="border-b border-slate-800 bg-slate-900/90 backdrop-blur-md sticky top-0 z-40 px-6 py-3.5 flex flex-col sm:flex-row items-center justify-between gap-3">
+              <div className="flex items-center space-x-3">
+                <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-sky-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-sky-500/20 font-bold text-lg">
+                  DV
+                </div>
+                <div>
+                  <h1 className="text-xl font-bold tracking-tight text-white flex items-center">
+                    DocuVerify <span className="text-sky-400 text-xs font-semibold ml-2 px-2 py-0.5 rounded-full bg-sky-950 border border-sky-800">PASSPORT v1.0</span>
+                  </h1>
+                  <p className="text-xs text-slate-400">AI-Assisted Border Credential Screening & Tampering Forensics</p>
+                </div>
+              </div>
+
+              <div className="flex items-center space-x-2 px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-medium">
+                <span>⚠️ Decision Support System — Never Auto-Rejects</span>
+              </div>
+
+              <div className="flex items-center space-x-2.5">
+                <button
+                  onClick={() => setHistoryOpen(true)}
+                  className="px-3 py-1.5 text-xs font-medium text-slate-300 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg transition"
+                >
+                  📜 Audit Trail ({logs.length})
+                </button>
+                <button
+                  onClick={() => setLimitationsOpen(true)}
+                  className="px-3 py-1.5 text-xs font-medium text-slate-300 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg transition"
+                >
+                  ℹ️ Scope Limitations
+                </button>
+                <span className="hidden lg:inline-block px-2.5 py-1 text-[11px] text-slate-400 bg-slate-950 rounded-md border border-slate-800">
+                  ⚡ ONNX CPU Serving
+                </span>
+              </div>
+            </header>
+
+            {/* Main Container */}
+            <main className="flex-1 max-w-7xl w-full mx-auto px-4 lg:px-8 py-8 space-y-8">
+              {/* Error Alert */}
+              {error && (
+                <div className="p-4 rounded-xl bg-rose-950/90 border border-rose-600 text-rose-200 flex items-start justify-between">
+                  <div>
+                    <strong className="block text-sm font-bold">Screening Exception:</strong>
+                    <span className="text-xs">{error}</span>
+                  </div>
+                  <button onClick={() => setError(null)} className="text-rose-400 hover:text-white">✕</button>
+                </div>
+              )}
+
+              {/* Document Intake & Upload Section */}
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
+                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-6 pb-4 border-b border-slate-800">
+                  <div>
+                    <h2 className="text-base font-bold text-white flex items-center">
+                      📄 Document Intake & Traveler Capture
+                    </h2>
+                    <p className="text-xs text-slate-400">
+                      Accepts phone photos or scans. Auto-detects ~1.42:1 aspect ratio, deskews, and corrects illumination.
+                    </p>
+                  </div>
+
+                  {/* Sample buttons */}
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="text-[11px] text-slate-400 mr-1">✨ Test Samples:</span>
+                    <button
+                      type="button"
+                      onClick={() => handleLoadSample("authentic")}
+                      className="px-2.5 py-1 text-[11px] font-medium bg-emerald-950 hover:bg-emerald-900 text-emerald-300 border border-emerald-800 rounded"
+                    >
+                      Authentic Pass
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleLoadSample("tampered_photo")}
+                      className="px-2.5 py-1 text-[11px] font-medium bg-rose-950 hover:bg-rose-900 text-rose-300 border border-rose-800 rounded"
+                    >
+                      Photo Splice (Tamper)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleLoadSample("blacklisted")}
+                      className="px-2.5 py-1 text-[11px] font-medium bg-amber-950 hover:bg-amber-900 text-amber-300 border border-amber-800 rounded"
+                    >
+                      Stolen / Blacklisted
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleLoadSample("bad_checksum")}
+                      className="px-2.5 py-1 text-[11px] font-medium bg-purple-950 hover:bg-purple-900 text-purple-300 border border-purple-800 rounded"
+                    >
+                      Bad Checksum
+                    </button>
+                  </div>
+                </div>
+
+                <form onSubmit={handleScreenSubmit}>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Passport upload */}
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-300 mb-2 uppercase tracking-wider">
+                        1. Passport Bio-Data Page <span className="text-rose-400">*</span>
+                      </label>
+                      <div
+                        onClick={() => docInputRef.current?.click()}
+                        className="border-2 border-dashed border-slate-700 hover:border-slate-500 rounded-xl h-48 flex flex-col items-center justify-center p-4 cursor-pointer bg-slate-800/40 relative overflow-hidden"
+                      >
+                        <input
+                          type="file"
+                          ref={docInputRef}
+                          onChange={(e) => e.target.files?.[0] && handleDocSelect(e.target.files[0])}
+                          accept="image/*"
+                          className="hidden"
+                        />
+                        {docPreview ? (
+                          <img src={docPreview} alt="Passport" className="max-h-full max-w-full object-contain rounded" />
+                        ) : (
+                          <div className="text-center space-y-1">
+                            <span className="text-2xl block">📁</span>
+                            <p className="text-xs font-semibold text-slate-200">Click or drop passport image</p>
+                            <p className="text-[11px] text-slate-400">JPEG, PNG, or WebP</p>
+                          </div>
+                        )}
+                      </div>
+                      <div className="mt-2 flex items-center justify-between text-xs text-slate-400">
+                        <label className="flex items-center space-x-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={forceCrop}
+                            onChange={(e) => setForceCrop(e.target.checked)}
+                            className="rounded bg-slate-800 border-slate-700"
+                          />
+                          <span className="text-[11px]">Force full crop (bypass strict 1.42:1 boundary if scan is unbordered)</span>
+                        </label>
+                      </div>
+                    </div>
+
+                    {/* Selfie upload */}
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-300 mb-2 uppercase tracking-wider">
+                        2. Live Traveler Capture <span className="text-slate-500 font-normal">(Optional)</span>
+                      </label>
+                      <div
+                        onClick={() => selfieInputRef.current?.click()}
+                        className="border-2 border-dashed border-slate-700 hover:border-slate-500 rounded-xl h-48 flex flex-col items-center justify-center p-4 cursor-pointer bg-slate-800/40 relative overflow-hidden"
+                      >
+                        <input
+                          type="file"
+                          ref={selfieInputRef}
+                          onChange={(e) => e.target.files?.[0] && handleSelfieSelect(e.target.files[0])}
+                          accept="image/*"
+                          className="hidden"
+                        />
+                        {selfiePreview ? (
+                          <img src={selfiePreview} alt="Selfie" className="max-h-full max-w-full object-contain rounded" />
+                        ) : (
+                          <div className="text-center space-y-1">
+                            <span className="text-2xl block">📸</span>
+                            <p className="text-xs font-semibold text-slate-200">Click to upload live selfie</p>
+                            <p className="text-[11px] text-slate-400">Cross-matches against passport portrait crop</p>
+                          </div>
+                        )}
+                      </div>
+                      <div className="mt-2 text-[11px] text-slate-400 italic">
+                        Note: Physical liveness / anti-spoofing is out of scope.
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-slate-800">
+                    <span className="text-xs text-slate-400">
+                      Pipelines: Auto-Deskew → PassportEye MRZ → ICAO Validator → ONNX CNN / ELA Ensemble → Biometric Face
+                    </span>
+                    <button
+                      type="submit"
+                      disabled={loading || !docFile}
+                      className={`px-6 py-2.5 rounded-xl font-semibold text-xs uppercase tracking-wider transition shadow-lg ${
+                        loading || !docFile
+                          ? "bg-slate-800 text-slate-500 cursor-not-allowed"
+                          : "bg-sky-600 hover:bg-sky-500 text-white shadow-sky-600/30"
+                      }`}
+                    >
+                      {loading ? "Running Screening Pipelines..." : "🔍 Screen Document for Tamper Risk"}
+                    </button>
+                  </div>
+                </form>
+              </div>
+
+              {/* Auto-Scan & ELA Heatmap Preview */}
+              {results?.scan_metadata && (
+                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
+                  <div className="flex items-center justify-between pb-3 border-b border-slate-800 mb-4">
+                    <div>
+                      <h3 className="text-sm font-bold text-white">Module 1: Auto-Scan & Perspective Deskew Result</h3>
+                      <p className="text-xs text-slate-400">1420x1000 TD3 Bio-page unwarped and illumination equalized</p>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <span className="px-2.5 py-1 rounded bg-emerald-950 text-emerald-400 text-xs border border-emerald-800">
+                        {results.scan_metadata.contour_detected ? `Contour Locked (~${results.scan_metadata.aspect_ratio}:1)` : "Fallback Crop"}
+                      </span>
+                      {results?.tamper_signals?.error_level_analysis?.heatmap_base64 && (
+                        <button
+                          onClick={() => setShowHeatmap(!showHeatmap)}
+                          className="px-2.5 py-1 rounded bg-rose-950 text-rose-300 text-xs border border-rose-800 font-medium"
+                        >
+                          {showHeatmap ? "Hide ELA Heatmap" : "🔥 View ELA Heatmap"}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 flex flex-col items-center">
+                      <span className="text-[11px] font-semibold text-slate-400 mb-2">Original Raw Input</span>
+                      <div className="w-full h-56 bg-slate-900 rounded flex items-center justify-center overflow-hidden">
+                        <img src={results.scan_metadata.preview_original_base64} alt="Original" className="max-h-full max-w-full object-contain" />
+                      </div>
+                    </div>
+                    <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 flex flex-col items-center">
+                      <span className="text-[11px] font-semibold text-slate-400 mb-2">
+                        {showHeatmap ? "Error Level Analysis Heatmap" : "Deskewed 1420x1000 Scan"}
+                      </span>
+                      <div className="w-full h-56 bg-slate-900 rounded flex items-center justify-center overflow-hidden">
+                        <img
+                          src={showHeatmap ? results.tamper_signals.error_level_analysis.heatmap_base64 : results.scan_metadata.preview_cropped_base64}
+                          alt="Processed"
+                          className="max-h-full max-w-full object-contain"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Results Dashboard */}
+              {results && (
+                <div className="space-y-6">
+                  {/* Big Recommendation Banner */}
+                  <div className={`p-6 rounded-2xl border ${recInfo?.bg} shadow-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4`}>
+                    <div>
+                      <span className="text-xs uppercase tracking-widest font-mono text-slate-300">Human Decision Support Advisory</span>
+                      <h2 className="text-2xl md:text-3xl font-extrabold text-white mt-0.5">{results.overall_recommendation}</h2>
+                      <p className="text-xs text-slate-300 mt-1 max-w-2xl font-medium">{results.human_officer_guidance}</p>
+                    </div>
+                    <div className="text-right font-mono text-xs text-slate-400 space-y-1">
+                      <div>Audit UUID: <span className="text-sky-400 font-bold">{results.audit_id?.slice(0, 8)}</span></div>
+                      <div className="px-2.5 py-1 rounded bg-slate-900 border border-slate-800 text-[11px] text-emerald-400">
+                        Model: {results.model_version}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Mock Blacklist banner if hit */}
+                  {results.validation?.mock_db_result?.matched && (
+                    <div className="p-4 rounded-xl bg-rose-950 border border-rose-600 text-rose-200 text-xs">
+                      <strong className="font-bold text-sm block">DOCUMENT ALERT: {results.validation.mock_db_result.database_source} (SIMULATION)</strong>
+                      <p className="mt-1">{results.validation.mock_db_result.reason}</p>
+                      <p className="italic text-[11px] text-rose-300/80">{results.validation.mock_db_result.note}</p>
+                    </div>
+                  )}
+
+                  {/* Forensic & Data Grid */}
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                    {/* Left 7 cols: Tamper Risk & Face */}
+                    <div className="lg:col-span-7 space-y-6">
+                      {/* Tamper score */}
+                      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
+                        <div className="flex items-center justify-between pb-3 border-b border-slate-800 mb-4">
+                          <h3 className="text-sm font-bold text-white">Module 4: Tamper & Forgery Risk Ensemble</h3>
+                          <span className={`px-2.5 py-0.5 rounded text-xs font-bold font-mono ${
+                            results.tamper_risk_score >= 65 ? "bg-rose-950 text-rose-300 border border-rose-800" :
+                            results.tamper_risk_score >= 30 ? "bg-amber-950 text-amber-300 border border-amber-800" :
+                            "bg-emerald-950 text-emerald-300 border border-emerald-800"
+                          }`}>
+                            Score: {results.tamper_risk_score} / 100
+                          </span>
+                        </div>
+
+                        {/* Signals list */}
+                        <div className="grid grid-cols-2 gap-3 text-xs">
+                          <div className="p-3 rounded-lg bg-slate-950 border border-slate-800">
+                            <span className="text-slate-400 block font-semibold">1. ONNX CNN Classifier (35%)</span>
+                            <span className="font-mono text-sky-400 font-bold text-sm mt-1 block">
+                              {results.tamper_signals?.cnn_model?.score}%
+                            </span>
+                            <span className="text-[10px] text-slate-500">MobileNetV3 on MIDV data</span>
+                          </div>
+
+                          <div className="p-3 rounded-lg bg-slate-950 border border-slate-800">
+                            <span className="text-slate-400 block font-semibold">2. Error Level Analysis (25%)</span>
+                            <span className="font-mono text-amber-400 font-bold text-sm mt-1 block">
+                              {results.tamper_signals?.error_level_analysis?.score}
+                            </span>
+                            <span className="text-[10px] text-slate-500">Compression error variance</span>
+                          </div>
+
+                          <div className="p-3 rounded-lg bg-slate-950 border border-slate-800">
+                            <span className="text-slate-400 block font-semibold">3. EXIF Metadata Forensics (15%)</span>
+                            <span className="font-mono text-indigo-400 font-bold text-sm mt-1 block">
+                              {results.tamper_signals?.exif_forensics?.score}%
+                            </span>
+                            <span className="text-[10px] text-slate-500">
+                              {results.tamper_signals?.exif_forensics?.software_detected || "No editor signatures"}
+                            </span>
+                          </div>
+
+                          <div className="p-3 rounded-lg bg-slate-950 border border-slate-800">
+                            <span className="text-slate-400 block font-semibold">4. MRZ Checksum Signal (25%)</span>
+                            <span className={`font-mono font-bold text-sm mt-1 block ${
+                              results.mrz_checksum_valid ? "text-emerald-400" : "text-rose-400"
+                            }`}>
+                              {results.mrz_checksum_valid ? "VALID (0)" : "FAILED (+95)"}
+                            </span>
+                            <span className="text-[10px] text-slate-500">ICAO 7-3-1 formula</span>
+                          </div>
+                        </div>
+
+                        {results.triggered_tamper_signals?.length > 0 && (
+                          <div className="mt-4 p-3 rounded-lg bg-rose-950/40 border border-rose-900/60 text-xs text-rose-300">
+                            <strong className="block font-semibold mb-1">Triggered Forensic Warnings:</strong>
+                            <ul className="list-disc list-inside space-y-0.5 text-[11px]">
+                              {results.triggered_tamper_signals.map((s, i) => <li key={i}>{s}</li>)}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Face Match Card */}
+                      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
+                        <div className="flex items-center justify-between pb-3 border-b border-slate-800 mb-4">
+                          <h3 className="text-sm font-bold text-white">Module 5: Facial Verification (1:1 Biometric)</h3>
+                          {results.face_match?.performed && (
+                            <span className={`px-2.5 py-0.5 rounded text-xs font-bold border ${
+                              results.face_match.is_match ? "bg-emerald-950 text-emerald-300 border-emerald-800" : "bg-rose-950 text-rose-300 border-rose-800"
+                            }`}>
+                              {results.face_match.is_match ? "SIMILARITY MATCH" : "LOW SIMILARITY"}
+                            </span>
+                          )}
+                        </div>
+
+                        {results.face_match?.performed ? (
+                          <div className="space-y-4">
+                            <div className="grid grid-cols-2 gap-4">
+                              <div className="flex flex-col items-center bg-slate-950 p-3 rounded-xl border border-slate-800">
+                                <span className="text-[11px] text-slate-400 mb-2">Passport Portrait Crop</span>
+                                <div className="w-24 h-32 rounded bg-slate-900 overflow-hidden border border-slate-700">
+                                  <img src={results.face_match.passport_face_preview_base64} alt="Passport Crop" className="w-full h-full object-cover" />
+                                </div>
+                              </div>
+                              <div className="flex flex-col items-center bg-slate-950 p-3 rounded-xl border border-slate-800">
+                                <span className="text-[11px] text-slate-400 mb-2">Live Traveler Capture</span>
+                                <div className="w-24 h-32 rounded bg-slate-900 overflow-hidden border border-slate-700">
+                                  <img src={results.face_match.live_face_preview_base64} alt="Live Crop" className="w-full h-full object-cover" />
+                                </div>
+                              </div>
+                            </div>
+                            <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 text-xs">
+                              <div className="flex justify-between mb-1">
+                                <span className="text-slate-300">Biometric Similarity:</span>
+                                <span className="font-mono font-bold text-indigo-400">{results.face_match.match_score}%</span>
+                              </div>
+                              <div className="w-full h-2 rounded-full bg-slate-800 overflow-hidden">
+                                <div className="h-full bg-indigo-500 rounded-full" style={{ width: `${results.face_match.match_score || 0}%` }} />
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="p-3 bg-slate-950 rounded-xl text-xs text-slate-400">
+                            Passport portrait extracted. Live traveler capture was not supplied for verification.
+                          </div>
+                        )}
+
+                        <div className="mt-3 text-[11px] text-amber-400/90 bg-amber-950/20 p-2 rounded border border-amber-900/30">
+                          ⚠️ <strong>Scope Note:</strong> Physical liveness / anti-spoofing is out of scope for this prototype.
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Right 5 cols: MRZ Data & Validation */}
+                    <div className="lg:col-span-5 space-y-6">
+                      {/* Extracted MRZ */}
+                      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl text-xs space-y-3">
+                        <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                          <h3 className="text-sm font-bold text-white">Module 2: MRZ Extraction</h3>
+                          <span className={`px-2 py-0.5 rounded text-[11px] font-bold border ${
+                            results.mrz_checksum_valid ? "bg-emerald-950 text-emerald-300 border-emerald-800" : "bg-rose-950 text-rose-300 border-rose-800"
+                          }`}>
+                            {results.mrz_checksum_valid ? "CHECKSUMS PASS" : "CHECKSUM FAILED"}
+                          </span>
+                        </div>
+
+                        <div className="flex justify-between p-2 rounded bg-slate-950 border border-slate-800">
+                          <span className="text-slate-400">Passport Number:</span>
+                          <span className="font-mono font-bold text-white">{results.extracted_fields?.passport_number?.value || 'N/A'}</span>
+                        </div>
+
+                        <div className="flex justify-between p-2 rounded bg-slate-950 border border-slate-800">
+                          <span className="text-slate-400">Traveler Name:</span>
+                          <span className="font-bold text-white">{results.extracted_fields?.full_name?.value || 'N/A'}</span>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="p-2 rounded bg-slate-950 border border-slate-800">
+                            <span className="text-[10px] text-slate-400 block">Nationality:</span>
+                            <span className="font-mono font-bold text-white">{results.extracted_fields?.nationality?.value || 'N/A'}</span>
+                          </div>
+                          <div className="p-2 rounded bg-slate-950 border border-slate-800">
+                            <span className="text-[10px] text-slate-400 block">Issuing State:</span>
+                            <span className="font-mono font-bold text-white">{results.extracted_fields?.issuing_country?.value || 'N/A'}</span>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="p-2 rounded bg-slate-950 border border-slate-800">
+                            <span className="text-[10px] text-slate-400 block">Date of Birth:</span>
+                            <span className="font-mono font-bold text-white">{results.extracted_fields?.dob?.value || 'N/A'}</span>
+                          </div>
+                          <div className="p-2 rounded bg-slate-950 border border-slate-800">
+                            <span className="text-[10px] text-slate-400 block">Expiry Date:</span>
+                            <span className="font-mono font-bold text-white">{results.extracted_fields?.expiry_date?.value || 'N/A'}</span>
+                          </div>
+                        </div>
+
+                        <div>
+                          <button
+                            type="button"
+                            onClick={() => setShowRawMrz(!showRawMrz)}
+                            className="text-[11px] text-sky-400 hover:underline"
+                          >
+                            {showRawMrz ? "Hide Raw MRZ" : "View Raw 2-Line MRZ"}
+                          </button>
+                          {showRawMrz && results.mrz_raw_lines && (
+                            <div className="mt-2 p-2 rounded bg-slate-950 font-mono text-[10px] text-emerald-400 border border-slate-800 space-y-1">
+                              <div>{results.mrz_raw_lines[0]}</div>
+                              <div>{results.mrz_raw_lines[1]}</div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Validation rules */}
+                      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl text-xs">
+                        <div className="flex items-center justify-between pb-3 border-b border-slate-800 mb-3">
+                          <h3 className="text-sm font-bold text-white">Module 3: Validation Logic</h3>
+                          <span className={`px-2 py-0.5 rounded text-[11px] font-bold border ${
+                            results.validation?.passed ? "bg-emerald-950 text-emerald-300 border-emerald-800" : "bg-rose-950 text-rose-300 border-rose-800"
+                          }`}>
+                            {results.validation?.passed ? "ALL PASSED" : "ISSUES FLAGGED"}
+                          </span>
+                        </div>
+
+                        {results.validation?.issues?.length > 0 ? (
+                          <div className="space-y-2">
+                            {results.validation.issues.map((iss, i) => (
+                              <div key={i} className={`p-2 rounded border ${
+                                iss.type === "error" ? "bg-rose-950/60 border-rose-800 text-rose-200" : "bg-amber-950/60 border-amber-800 text-amber-200"
+                              }`}>
+                                <span className="font-mono text-[10px] block uppercase font-bold">[{iss.code}]</span>
+                                <span>{iss.message}</span>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="p-2.5 rounded bg-emerald-950/40 border border-emerald-900 text-emerald-400">
+                            ✓ Format regex, date logic, and character sets verified.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </main>
+
+            {/* Audit History Modal */}
+            {historyOpen && (
+              <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+                <div className="bg-slate-900 border border-slate-700 rounded-2xl max-w-4xl w-full max-h-[80vh] flex flex-col p-6 shadow-2xl">
+                  <div className="flex justify-between items-center pb-4 border-b border-slate-800">
+                    <h2 className="text-base font-bold text-white">📜 Digital Audit Trail</h2>
+                    <button onClick={() => setHistoryOpen(false)} className="text-slate-400 hover:text-white">✕</button>
+                  </div>
+                  <div className="flex-1 overflow-y-auto mt-4">
+                    {logs.length === 0 ? (
+                      <div className="text-center py-8 text-slate-500 text-xs">No audit logs recorded yet.</div>
+                    ) : (
+                      <table className="w-full text-left text-xs text-slate-300">
+                        <thead className="bg-slate-950 text-[10px] text-slate-400 border-b border-slate-800">
+                          <tr>
+                            <th className="p-2">Timestamp</th>
+                            <th className="p-2">Passport #</th>
+                            <th className="p-2">Traveler Name</th>
+                            <th className="p-2">State</th>
+                            <th className="p-2">Tamper Score</th>
+                            <th className="p-2">Recommendation</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-800">
+                          {logs.map((l) => (
+                            <tr key={l.id}>
+                              <td className="p-2 font-mono text-[11px] text-slate-400">{new Date(l.timestamp).toLocaleTimeString()}</td>
+                              <td className="p-2 font-mono font-bold text-white">{l.passport_number || 'UNKNOWN'}</td>
+                              <td className="p-2">{l.traveler_name || 'N/A'}</td>
+                              <td className="p-2 font-mono">{l.issuing_country || 'N/A'}</td>
+                              <td className="p-2 font-mono">{l.tamper_risk_score}/100</td>
+                              <td className="p-2 font-semibold">{l.overall_recommendation}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Scope Limitations Modal */}
+            {limitationsOpen && (
+              <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+                <div className="bg-slate-900 border border-slate-700 rounded-2xl max-w-xl w-full p-6 shadow-2xl space-y-4">
+                  <div className="flex justify-between items-center pb-3 border-b border-slate-800">
+                    <h2 className="text-base font-bold text-white">System Scope & Disclaimers</h2>
+                    <button onClick={() => setLimitationsOpen(false)} className="text-slate-400 hover:text-white">✕</button>
+                  </div>
+                  <div className="space-y-3 text-xs text-slate-300">
+                    <div className="p-3 bg-slate-800/60 rounded-xl border border-slate-700">
+                      <strong className="text-white block uppercase text-[11px]">1. Mock Database Stand-In:</strong>
+                      No live Interpol SLTD or government database connection. Queries local simulated CSV test records.
+                    </div>
+                    <div className="p-3 bg-slate-800/60 rounded-xl border border-slate-700">
+                      <strong className="text-white block uppercase text-[11px]">2. No Facial Liveness / Anti-Spoofing:</strong>
+                      Biometric matching evaluates visual similarity only. Depth and presentation attack detection are out of scope.
+                    </div>
+                    <div className="p-3 bg-slate-800/60 rounded-xl border border-slate-700">
+                      <strong className="text-white block uppercase text-[11px]">3. Decision Support Only:</strong>
+                      Outputs probabilistic indicators to assist human border officers. Never auto-rejects travelers.
+                    </div>
+                    <div className="p-3 bg-slate-800/60 rounded-xl border border-slate-700">
+                      <strong className="text-white block uppercase text-[11px]">4. Not Certified for Live Border Operations:</strong>
+                      Research and evaluation prototype. Formal ICAO Doc 9303 accreditation required for live border deployment.
+                    </div>
+                  </div>
+                  <div className="pt-2 text-right">
+                    <button
+                      onClick={() => setLimitationsOpen(false)}
+                      className="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-lg text-xs font-semibold"
+                    >
+                      Acknowledge
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Footer */}
+            <footer className="border-t border-slate-900 bg-slate-950/80 py-6 px-6 text-center text-xs text-slate-500">
+              DocuVerify Border Credential Forensics • FastAPI + React + OpenCV + ONNX Runtime • Decision Support Only
+            </footer>
+          </div>
+        );
+      }
+
+      ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    </script>
+  </body>
+</html>

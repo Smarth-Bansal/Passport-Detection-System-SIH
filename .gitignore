@@ -1,0 +1,13 @@
+venv/
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+node_modules/
+.DS_Store
+*.log
+*.ses
+docuverify.db
+.env

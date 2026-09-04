@@ -1,0 +1,13 @@
+venv/
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+node_modules/
+.git/
+.gitignore
+.DS_Store
+*.log
+docuverify.db
