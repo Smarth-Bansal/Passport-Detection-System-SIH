@@ -27,7 +27,13 @@ export default function ScanPreview({ scanMetadata, elaHeatmapBase64 }) {
           </p>
         </div>
 
-        <div className="flex items-center space-x-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {scanMetadata.crop_method && (
+            <span className="px-2.5 py-1 rounded-md bg-sky-950 border border-sky-800 text-sky-300 text-xs font-mono font-medium">
+              Method: {scanMetadata.crop_method}
+            </span>
+          )}
+
           {contour_detected ? (
             <span className="flex items-center space-x-1 px-2.5 py-1 rounded-md bg-emerald-950/80 border border-emerald-800 text-emerald-400 text-xs font-medium">
               <CheckCircle className="w-3.5 h-3.5" />
@@ -36,7 +42,7 @@ export default function ScanPreview({ scanMetadata, elaHeatmapBase64 }) {
           ) : (
             <span className="flex items-center space-x-1 px-2.5 py-1 rounded-md bg-amber-950/80 border border-amber-800 text-amber-400 text-xs font-medium">
               <AlertTriangle className="w-3.5 h-3.5" />
-              <span>Fallback Crop Used</span>
+              <span>Aspect Normalization</span>
             </span>
           )}
 

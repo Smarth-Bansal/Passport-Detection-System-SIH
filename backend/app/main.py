@@ -98,6 +98,7 @@ async def screen_document(
     document_image: UploadFile = File(..., description="Image of passport bio-data page"),
     live_selfie: Optional[UploadFile] = File(None, description="Optional live traveler webcam snapshot"),
     force_crop: bool = Form(False, description="If true, bypass strict 1.42:1 contour detection on failure"),
+    crop_mode: str = Form("auto", description="Crop strategy: 'auto', 'bottom_half', 'top_half', 'full'"),
     db: Session = Depends(get_db),
 ):
     """
@@ -127,14 +128,14 @@ async def screen_document(
 
     # Step 1: Auto-Scan & Perspective Preprocessing
     try:
-        scan_result = scan_passport(doc_bytes, force_fallback=force_crop)
+        scan_result = scan_passport(doc_bytes, force_fallback=force_crop, crop_mode=crop_mode)
     except ScannerError as se:
         return JSONResponse(
             status_code=422,
             content={
                 "error": "SCANNER_ERROR",
                 "message": str(se),
-                "suggestion": "Place passport flat against a contrasting background with all 4 corners visible, or enable 'Force Full Crop' in settings."
+                "suggestion": "Place passport flat against a contrasting background with all 4 corners visible, or select 'Bottom Half (Open Passport)' / 'Force Full Crop' in crop settings."
             }
         )
     except Exception as e:
@@ -165,11 +166,23 @@ async def screen_document(
         mrz_checksum_valid=mrz_checksum_valid if mrz_found else False
     )
 
-    # Step 5: Face Verification
+    # Step 5: Face Verification & Photo Determination
     face_result = compare_faces(
         passport_image_bgr=cropped_bgr,
         live_selfie_bytes=selfie_bytes
     )
+
+    photo_det = face_result.get("photo_determination", {})
+    if photo_det.get("is_flagged"):
+        for flg in photo_det.get("flags", []):
+            if flg not in tamper_result["triggered_signals"]:
+                tamper_result["triggered_signals"].append(f"Photo: {flg}")
+
+    # Incorporate photo tampering risk into composite tamper score
+    if photo_det.get("photo_risk_score", 0) > 40.0:
+        # Boost tamper risk score with photo splice evidence
+        boosted_score = max(tamper_result["tamper_risk_score"], photo_det.get("photo_risk_score", 0))
+        tamper_result["tamper_risk_score"] = round(boosted_score, 1)
 
     # Step 6: Recommendation Calculation
     overall_recommendation = compute_recommendation(
@@ -184,6 +197,7 @@ async def screen_document(
         "scan_metadata": {
             "contour_detected": scan_result["contour_detected"],
             "aspect_ratio": scan_result["aspect_ratio"],
+            "crop_method": scan_result.get("crop_method", "Auto"),
             "dimensions": scan_result["dimensions"],
             "preview_cropped_base64": scan_result["preview_cropped_base64"],
             "preview_original_base64": scan_result["preview_original_base64"],

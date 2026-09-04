@@ -79,3 +79,28 @@ def test_screen_endpoint_scanner_error_on_invalid_image():
     err = response.json()
     assert err["error"] == "SCANNER_ERROR"
     assert "suggestion" in err
+
+
+def test_screen_endpoint_with_crop_mode_and_photo_forensics():
+    img = create_synthetic_passport_image()
+    _, enc = cv2.imencode(".jpg", img)
+    image_bytes = enc.tobytes()
+
+    files = {
+        "document_image": ("passport_bottom.jpg", image_bytes, "image/jpeg")
+    }
+    data = {
+        "crop_mode": "bottom_half",
+        "force_crop": "true"
+    }
+
+    response = client.post("/screen", files=files, data=data)
+    assert response.status_code == 200
+    res = response.json()
+
+    assert "crop_method" in res["scan_metadata"]
+    assert "photo_determination" in res["face_match"]
+    assert "photo_risk_score" in res["face_match"]["photo_determination"]
+    assert "splice_detected" in res["face_match"]["photo_determination"]
+    assert "flags" in res["face_match"]["photo_determination"]
+

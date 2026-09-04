@@ -32,7 +32,7 @@ export default function App() {
     }
   };
 
-  const handleScreen = async ({ document_image, live_selfie, force_crop }) => {
+  const handleScreen = async ({ document_image, live_selfie, force_crop, crop_mode }) => {
     setLoading(true);
     setError(null);
     try {
@@ -42,6 +42,7 @@ export default function App() {
         formData.append('live_selfie', live_selfie);
       }
       formData.append('force_crop', force_crop ? 'true' : 'false');
+      formData.append('crop_mode', crop_mode || 'auto');
 
       const response = await fetch('/screen', {
         method: 'POST',

@@ -13,6 +13,7 @@ export default function UploadSection({
   const [selfieFile, setSelfieFile] = useState(null);
   const [selfiePreview, setSelfiePreview] = useState(null);
   const [isWebcamActive, setIsWebcamActive] = useState(false);
+  const [cropMode, setCropMode] = useState('auto');
 
   const docInputRef = useRef(null);
   const selfieInputRef = useRef(null);
@@ -86,6 +87,7 @@ export default function UploadSection({
       document_image: docFile,
       live_selfie: selfieFile,
       force_crop: forceCrop,
+      crop_mode: cropMode,
     });
   };
 
@@ -203,21 +205,47 @@ export default function UploadSection({
               )}
             </div>
 
-            <div className="mt-2.5 flex items-center justify-between text-xs">
-              <label className="flex items-center space-x-2 text-slate-400 hover:text-slate-200 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={forceCrop}
-                  onChange={(e) => setForceCrop(e.target.checked)}
-                  className="rounded bg-slate-800 border-slate-700 text-sky-500 focus:ring-0 focus:ring-offset-0"
-                />
-                <span className="text-[11px]">Force full crop (bypass strict contour if scan is unbordered)</span>
-              </label>
-              {docFile && (
-                <span className="text-[11px] text-slate-400 truncate max-w-[150px]">
-                  {docFile.name}
-                </span>
-              )}
+            <div className="mt-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-semibold text-slate-300">Scan Crop Mode:</span>
+                <div className="flex items-center space-x-1">
+                  {[
+                    { id: 'auto', label: 'Auto Detect' },
+                    { id: 'bottom_half', label: 'Bottom Half (Open Booklet)' },
+                    { id: 'full', label: 'Full Frame' }
+                  ].map((mode) => (
+                    <button
+                      key={mode.id}
+                      type="button"
+                      onClick={() => setCropMode(mode.id)}
+                      className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${
+                        cropMode === mode.id
+                          ? 'bg-sky-600 text-white font-bold'
+                          : 'bg-slate-800 text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      {mode.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between text-xs">
+                <label className="flex items-center space-x-2 text-slate-400 hover:text-slate-200 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={forceCrop}
+                    onChange={(e) => setForceCrop(e.target.checked)}
+                    className="rounded bg-slate-800 border-slate-700 text-sky-500 focus:ring-0 focus:ring-offset-0"
+                  />
+                  <span className="text-[11px]">Force fallback crop if edges are noisy</span>
+                </label>
+                {docFile && (
+                  <span className="text-[11px] text-slate-400 truncate max-w-[150px]">
+                    {docFile.name}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
 
