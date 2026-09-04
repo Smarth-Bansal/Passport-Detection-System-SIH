@@ -14,6 +14,9 @@ from backend.app.services.scanner import (
 )
 from backend.app.services.ocr_engine import (
     compute_icao_check_digit,
+    compute_icao_breakdown,
+    clean_td3_line1,
+    clean_td3_line2,
     parse_mrz_lines,
     extract_mrz,
     extract_document_fields,
@@ -144,6 +147,41 @@ def test_parse_mrz_lines():
     assert res["dob"] == "900101"
     assert res["sex"] == "M"
     assert res["expiry_date"] == "300101"
+
+
+def test_contextual_cleaning_user_passport():
+    # User's exact phone scan OCR noise:
+    # Delimiter glitch 'P<I<ND', trailing 'K' chevrons, '1ND' in nationality
+    raw_l1 = "P<I<NDBANSAL<<SMARTHKK<KKKKKKKKKEKKKKKKKKKKK"
+    raw_l2 = "W6734242<81ND0804183M260417004C4102642022<18"
+
+    cleaned_l2 = clean_td3_line2(raw_l2)
+    assert cleaned_l2.startswith("W6734242<8IND")
+    assert cleaned_l2[10:13] == "IND"
+
+    cleaned_l1 = clean_td3_line1(raw_l1, nat_hint="IND")
+    assert cleaned_l1.startswith("P<INDBANSAL<<SMARTH<")
+    assert cleaned_l1.endswith("<")
+
+    parsed = parse_mrz_lines(raw_l1, raw_l2)
+    assert parsed["issuing_country"] == "IND"
+    assert parsed["nationality"] == "IND"
+    assert parsed["surname"] == "BANSAL"
+    assert parsed["given_names"] == "SMARTH"
+    assert parsed["full_name"] == "SMARTH BANSAL"
+    assert parsed["passport_number"] == "W6734242"
+    assert parsed["checksum_results"]["all_valid"] is True
+
+
+def test_compute_icao_breakdown():
+    bd = compute_icao_breakdown("W6734242", [7, 3, 1], 10, expected_check="8")
+    assert bd["computed_check_digit"] == "8"
+    assert bd["is_valid"] is True
+    assert len(bd["steps"]) == 8
+    assert bd["steps"][0]["char"] == "W"
+    assert bd["steps"][0]["val"] == 32
+    assert bd["steps"][0]["weight"] == 7
+    assert bd["steps"][0]["product"] == 224
 
 
 # ==========================================

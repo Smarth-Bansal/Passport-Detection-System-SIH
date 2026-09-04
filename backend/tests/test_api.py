@@ -139,3 +139,61 @@ def test_screen_endpoint_with_selfie_and_audit_persistence():
     assert audit_resp.json()["id"] == audit_id
 
 
+def test_calculate_icao_endpoint():
+    # Test standard check digit calculation for passport number
+    resp = client.post("/calculate-icao", json={
+        "data_string": "W6734242",
+        "weights": "7,3,1",
+        "modulo": 10,
+        "expected_check_digit": "8"
+    })
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["computed_check_digit"] == "8"
+    assert data["is_valid"] is True
+    assert len(data["steps"]) == 8
+
+    # Test custom weights and modulo
+    resp_custom = client.post("/calculate-icao", json={
+        "data_string": "12345",
+        "weights": "3,1,7",
+        "modulo": 11
+    })
+    assert resp_custom.status_code == 200
+    custom_data = resp_custom.json()
+    assert custom_data["weights"] == [3, 1, 7]
+    assert custom_data["modulo"] == 11
+    assert "formula_expression" in custom_data
+
+
+def test_screen_with_manual_mrz_override():
+    img = create_synthetic_passport_image()
+    _, enc = cv2.imencode(".jpg", img)
+    image_bytes = enc.tobytes()
+
+    l1 = "P<INDBANSAL<<SMARTH<<<<<<<<<<<<<<<<<<<<<<<<<"
+    l2 = "W6734242<8IND0804183M260417004C4102642022<18"
+
+    files = {
+        "document_image": ("smarth_passport.jpg", image_bytes, "image/jpeg")
+    }
+    data = {
+        "manual_mrz_line1": l1,
+        "manual_mrz_line2": l2,
+        "icao_weights": "7,3,1",
+        "icao_modulo": 10,
+        "force_crop": "true"
+    }
+
+    response = client.post("/screen", files=files, data=data)
+    assert response.status_code == 200
+    res = response.json()
+
+    assert res["mrz_checksum_valid"] is True
+    assert res["extracted_fields"]["passport_number"]["value"] == "W6734242"
+    assert res["extracted_fields"]["full_name"]["value"] == "SMARTH BANSAL"
+    assert res["extracted_fields"]["nationality"]["value"] == "IND"
+    assert res["extracted_fields"]["issuing_country"]["value"] == "IND"
+
+
+

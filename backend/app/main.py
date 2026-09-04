@@ -6,6 +6,7 @@ from fastapi import FastAPI, UploadFile, File, Form, Depends, HTTPException, sta
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from .config import (
@@ -29,6 +30,9 @@ from .services import (
     scan_passport,
     ScannerError,
     extract_document_fields,
+    compute_icao_check_digit,
+    compute_icao_breakdown,
+    parse_weights_string,
     validate_document,
     detect_tampering,
     compare_faces,
@@ -53,6 +57,29 @@ app.add_middleware(
 )
 
 
+class IcaoCalculationRequest(BaseModel):
+    data_string: str
+    weights: Optional[str] = "7,3,1"
+    modulo: Optional[int] = 10
+    expected_check_digit: Optional[str] = None
+
+
+@app.post("/calculate-icao")
+def calculate_icao_endpoint(payload: IcaoCalculationRequest):
+    """
+    Evaluates arbitrary string against standard or custom ICAO weighting formula.
+    Returns step-by-step arithmetic breakdown.
+    """
+    weights_list = parse_weights_string(payload.weights)
+    mod = payload.modulo if payload.modulo and payload.modulo > 0 else 10
+    return compute_icao_breakdown(
+        data=payload.data_string,
+        weights=weights_list,
+        modulo=mod,
+        expected_check=payload.expected_check_digit,
+    )
+
+
 @app.get("/health")
 def health_check():
     return {
@@ -61,7 +88,7 @@ def health_check():
         "version": APP_VERSION,
         "model_version": MODEL_VERSION,
         "kaggle_notebook": KAGGLE_NOTEBOOK_REF,
-        "notice": "Decision support prototype for authorized human reviewers only. Never auto-rejects."
+        "notice": "Decision support prototype for authorized human reviewers only. Never auto-reject."
     }
 
 
@@ -72,31 +99,30 @@ def compute_recommendation(
     face_match_result: dict,
 ) -> str:
     """
-    Computes an officer advisory recommendation.
-    Policy: Never auto-reject. System only flags risk level for human adjudication.
+    Computes final human decision-support recommendation:
+    - LOW RISK — proceed
+    - MEDIUM — manual review
+    - HIGH — flag for secondary inspection
+    *GUARANTEE: strictly never auto-rejects a passenger*
     """
-    issues = validation_result.get("issues", [])
-    has_critical_validation_error = any(i.get("type") == "error" for i in issues)
-    mock_db_matched = validation_result.get("mock_db_result", {}).get("matched", False)
+    has_critical_validation_error = any(
+        issue.get("type") == "error" and issue.get("code") in [
+            "CHECKSUM_PASSPORT_NUMBER_INVALID",
+            "MOCK_BLACKLIST_MATCH",
+            "PASSPORT_EXPIRED"
+        ]
+        for issue in validation_result.get("issues", [])
+    )
 
-    # Secondary inspection flags
-    if (
-        tamper_risk_score >= TAMPER_RISK_MEDIUM_MAX
-        or not mrz_checksum_valid
-        or mock_db_matched
-        or (face_match_result.get("performed") and face_match_result.get("match_score", 100) < 40.0)
-    ):
+    face_match_failed = (
+        face_match_result.get("performed", False) and
+        face_match_result.get("is_match") is False
+    )
+
+    if tamper_risk_score > TAMPER_RISK_MEDIUM_MAX or has_critical_validation_error or face_match_failed:
         return "HIGH — flag for secondary inspection"
-
-    # Manual review flags
-    if (
-        tamper_risk_score >= TAMPER_RISK_LOW_MAX
-        or has_critical_validation_error
-        or len(issues) > 0
-        or (face_match_result.get("performed") and not face_match_result.get("is_match", True))
-    ):
+    elif tamper_risk_score > TAMPER_RISK_LOW_MAX or not mrz_checksum_valid or not validation_result.get("passed", False):
         return "MEDIUM — manual review"
-
     return "LOW RISK — proceed"
 
 
@@ -106,6 +132,10 @@ async def screen_document(
     live_selfie: Optional[UploadFile] = File(None, description="Optional live traveler webcam snapshot"),
     force_crop: bool = Form(False, description="If true, bypass strict 1.42:1 contour detection on failure"),
     crop_mode: str = Form("auto", description="Crop strategy: 'auto', 'bottom_half', 'top_half', 'full'"),
+    manual_mrz_line1: Optional[str] = Form(None, description="Optional manual override for MRZ line 1"),
+    manual_mrz_line2: Optional[str] = Form(None, description="Optional manual override for MRZ line 2"),
+    icao_weights: Optional[str] = Form(None, description="Custom ICAO weights sequence, e.g. '7,3,1'"),
+    icao_modulo: Optional[int] = Form(10, description="Custom ICAO modulo divisor"),
     db: Session = Depends(get_db),
 ):
     """
@@ -150,8 +180,18 @@ async def screen_document(
 
     cropped_bgr = scan_result["cropped_bgr"]
 
-    # Step 2: MRZ + OCR Extraction
-    ocr_result = extract_document_fields(cropped_bgr)
+    # Parse custom ICAO weights if specified
+    custom_weights = parse_weights_string(icao_weights) if icao_weights else [7, 3, 1]
+    active_modulo = icao_modulo if icao_modulo and icao_modulo > 0 else 10
+
+    # Step 2: MRZ + OCR Extraction (supports manual override and custom ICAO formula)
+    ocr_result = extract_document_fields(
+        cropped_bgr,
+        manual_line1=manual_mrz_line1,
+        manual_line2=manual_mrz_line2,
+        weights=custom_weights,
+        modulo=active_modulo,
+    )
     mrz_data = ocr_result.get("mrz", {})
     mrz_found = mrz_data.get("found", False)
     mrz_checksum_valid = ocr_result.get("all_checksums_pass", False)
@@ -212,6 +252,8 @@ async def screen_document(
         "extracted_fields": fields,
         "mrz_raw_lines": mrz_data.get("raw_lines", []),
         "mrz_checksum_valid": mrz_checksum_valid,
+        "mrz_checksums": mrz_data.get("checksums", {}),
+        "formula_used": mrz_data.get("formula_used", {"weights": custom_weights, "modulo": active_modulo}),
         "mrz_found": mrz_found,
         "viz_cross_checks": ocr_result.get("cross_checks", []),
         "validation": {

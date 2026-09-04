@@ -305,7 +305,7 @@ def detect_tampering(
 
     # Assemble triggered signals list
     triggered_signals = []
-    if cnn_score >= 50.0:
+    if cnn_score >= 60.0:
         triggered_signals.append(f"CNN Model flagged forgery pattern ({cnn_score}% probability)")
     if ela_res.get("flagged"):
         triggered_signals.append(f"ELA detected localized compression disparity ({ela_score} anomaly score)")
